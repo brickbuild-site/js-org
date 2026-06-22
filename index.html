@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BrickBuild</title>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -19,6 +19,7 @@
 <button class="nav-btn" data-panel="users" onclick="showPanel('users')">Users</button>
 <button class="nav-btn" data-panel="create" onclick="showPanel('create')">Create</button>
 <button class="nav-btn" data-panel="catalog" onclick="showPanel('catalog')">Catalog</button>
+<button class="nav-btn" data-panel="avatar" onclick="showPanel('avatar')">Avatar</button>
 </nav>
 <div class="auth-area">
 <span id="current-user-chip" class="user-chip" style="display:none"></span>
@@ -95,6 +96,14 @@
 <div id="item-content"><div class="loading">Loading...</div></div>
 </div>
 
+<div id="panel-avatar" class="panel">
+<div class="panel-header">
+<h1>Avatar</h1>
+<button class="refresh-btn" onclick="loadAvatar()">Refresh</button>
+</div>
+<div id="avatar-content"><div class="loading">Login to view your avatar.</div></div>
+</div>
+
 <div id="panel-profile" class="panel">
 <div class="panel-header">
 <button class="back-btn" onclick="showPanel('users')">&larr; Back</button>
@@ -130,6 +139,6 @@
 </div>
 </div>
 
-<script src="script.js?v=4"></script>
+<script src="script.js?v=5"></script>
 </body>
 </html>

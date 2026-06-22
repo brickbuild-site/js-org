@@ -56,6 +56,106 @@ function showPanel(name) {
         if (name === 'games') loadGames();
         if (name === 'users') loadUsers();
         if (name === 'catalog') loadCatalog();
+        if (name === 'avatar') loadAvatar();
+}
+
+function loadAvatar() {
+        const content = document.getElementById('avatar-content');
+        if (!currentUser) {
+                content.innerHTML = '<div class="empty-state">Login to view and equip your avatar items.<br><br><button class="primary-btn" style="max-width:200px" onclick="openAuthModal()">Login</button></div>';
+                return;
+        }
+        content.innerHTML = '<div class="loading">Loading avatar...</div>';
+        const enc = encodeURIComponent(currentUser);
+        Promise.all([
+                fbGet('/users/' + enc + '.json').catch(() => null),
+                fbGet('/users/' + enc + '/owned_items.json').catch(() => null),
+                fbGet('/users/' + enc + '/wearing.json').catch(() => null),
+                fbGet('/catalog.json').catch(() => null)
+        ]).then(results => {
+                const info = results[0] || {};
+                const owned = results[1] || {};
+                const wearing = results[2] || {};
+                const catalog = results[3] || {};
+                let avatarHtml;
+                if (info.avatar) {
+                        avatarHtml = '<div class="avatar-preview-big has-img"><img src="data:image/png;base64,' + info.avatar + '" alt=""></div>';
+                } else {
+                        avatarHtml = '<div class="avatar-preview-big">' + initials(currentUser) + '</div>';
+                }
+                let equippedHtml = '';
+                let equippedCount = 0;
+                Object.entries(wearing).forEach(([slot, itemId]) => {
+                        const item = catalog[itemId];
+                        if (!item) return;
+                        equippedCount++;
+                        let imgHtml = '';
+                        if (item.image_data) {
+                                imgHtml = '<img src="data:image/png;base64,' + item.image_data + '" alt="">';
+                        }
+                        equippedHtml += '<div class="equipped-item">' +
+                                '<div class="equipped-item-img">' + imgHtml + '</div>' +
+                                '<div class="equipped-item-info"><div class="name">' + escapeHtml(item.name || 'Untitled') + '</div>' +
+                                '<div class="type">' + escapeHtml(slot) + '</div></div>' +
+                                '<button class="unequip-btn" onclick="unequipItem(\'' + escapeAttr(slot) + '\')">Remove</button>' +
+                                '</div>';
+                });
+                if (equippedCount === 0) {
+                        equippedHtml = '<div class="empty-state">No items equipped. Click an item below to wear it.</div>';
+                }
+                let inventoryHtml = '';
+                const ownedIds = Object.keys(owned);
+                if (ownedIds.length === 0) {
+                        inventoryHtml = '<div class="empty-state">No items owned. Go to the Catalog to get some!</div>';
+                } else {
+                        inventoryHtml = '<div class="inventory-grid">';
+                        ownedIds.forEach(iid => {
+                                const item = catalog[iid];
+                                if (!item) return;
+                                const slot = item.type || 'item';
+                                const isEquipped = wearing[slot] === iid;
+                                let imgHtml = '';
+                                if (item.image_data) {
+                                        imgHtml = '<img src="data:image/png;base64,' + item.image_data + '" alt="">';
+                                }
+                                inventoryHtml += '<div class="inventory-card' + (isEquipped ? ' equipped' : '') + '" onclick="equipItem(\'' + escapeAttr(iid) + '\',\'' + escapeAttr(slot) + '\')">' +
+                                        '<div class="inventory-card-img">' + imgHtml + '</div>' +
+                                        '<div class="name">' + escapeHtml(item.name || 'Untitled') + '</div>' +
+                                        '<div class="tag">' + escapeHtml(slot) + '</div>' +
+                                        (isEquipped ? '<div class="equipped-badge">Wearing</div>' : '') +
+                                        '</div>';
+                        });
+                        inventoryHtml += '</div>';
+                }
+                content.innerHTML = '<div class="avatar-layout">' +
+                        '<div><div class="avatar-section">' +
+                        avatarHtml +
+                        '<div class="avatar-info"><h2>' + escapeHtml(currentUser) + '</h2>' +
+                        '<div class="bio">' + escapeHtml(info.bio || 'No bio yet.') + '</div>' +
+                        '<button class="edit-profile-btn" onclick="openEditProfile()">Edit Profile</button>' +
+                        '</div></div></div>' +
+                        '<div><div class="avatar-section"><h3>Currently Wearing</h3>' + equippedHtml + '</div>' +
+                        '<div class="avatar-section"><h3>Your Inventory (' + ownedIds.length + ')</h3>' + inventoryHtml + '</div></div>' +
+                        '</div>';
+        }).catch(err => {
+                content.innerHTML = '<div class="loading">Failed to load: ' + escapeHtml(err.message) + '</div>';
+        });
+}
+
+function equipItem(itemId, slot) {
+        if (!currentUser) { openAuthModal(); return; }
+        const enc = encodeURIComponent(currentUser);
+        fbPut('/users/' + enc + '/wearing/' + encodeURIComponent(slot) + '.json', itemId).then(() => {
+                loadAvatar();
+        }).catch(err => { alert('Failed to equip: ' + err.message); });
+}
+
+function unequipItem(slot) {
+        if (!currentUser) return;
+        const enc = encodeURIComponent(currentUser);
+        fbDelete('/users/' + enc + '/wearing/' + encodeURIComponent(slot) + '.json').then(() => {
+                loadAvatar();
+        }).catch(err => { alert('Failed to remove: ' + err.message); });
 }
 
 function loadGames() {
