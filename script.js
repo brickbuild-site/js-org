@@ -103,7 +103,13 @@ function loadUsers() {
                                 const fc = (fols[i] && typeof fols[i] === 'object') ? Object.keys(fols[i]).length : 0;
                                 const card = document.createElement('div');
                                 card.className = 'card user-card';
-                                card.innerHTML = '<div class="user-avatar">' + initials(n) + '</div>' +
+                                let avatarHtml;
+                                if (info.avatar) {
+                                        avatarHtml = '<div class="user-avatar"><img src="data:image/png;base64,' + info.avatar + '" alt=""></div>';
+                                } else {
+                                        avatarHtml = '<div class="user-avatar">' + initials(n) + '</div>';
+                                }
+                                card.innerHTML = avatarHtml +
                                         '<div class="user-name">' + escapeHtml(n) + '</div>' +
                                         '<div class="user-bio">' + escapeHtml(info.bio || '') + '</div>' +
                                         '<div class="user-followers">' + fc + ' followers</div>';
@@ -140,9 +146,90 @@ function loadCatalog() {
                                 e.stopPropagation();
                                 viewProfile(author);
                         });
+                        const capturedIid = iid;
+                        card.addEventListener('click', () => viewItem(capturedIid));
                         grid.appendChild(card);
                 });
         }).catch(err => { grid.innerHTML = '<div class="loading">Failed to load: ' + escapeHtml(err.message) + '</div>'; });
+}
+
+function viewItem(itemId) {
+        showPanel('item');
+        document.querySelectorAll('.nav-btn[data-panel]').forEach(b => b.classList.remove('active'));
+        const content = document.getElementById('item-content');
+        content.innerHTML = '<div class="loading">Loading item...</div>';
+        fbGet('/catalog/' + encodeURIComponent(itemId) + '.json').then(item => {
+                if (!item) {
+                        content.innerHTML = '<div class="loading">Item not found.</div>';
+                        return;
+                }
+                let imgHtml = '';
+                if (item.image_data) {
+                        imgHtml = '<div class="item-detail-img"><img src="data:image/png;base64,' + item.image_data + '" alt=""></div>';
+                } else if (item.image_path) {
+                        imgHtml = '<div class="item-detail-img"><img src="' + escapeHtml(item.image_path) + '" alt=""></div>';
+                }
+                const author = item.author || 'Unknown';
+                const type = (item.type || 'item').charAt(0).toUpperCase() + (item.type || '').slice(1);
+                content.innerHTML = '<div class="item-detail">' +
+                        imgHtml +
+                        '<h2>' + escapeHtml(item.name || 'Untitled') + '</h2>' +
+                        '<div class="item-type">' + escapeHtml(type) + '</div>' +
+                        '<div class="item-author">by <a href="#" id="item-author-link">' + escapeHtml(author) + '</a></div>' +
+                        '<div class="item-price">Free</div>' +
+                        '<button class="buy-btn" id="buy-btn" onclick="buyItem(\'' + escapeAttr(itemId) + '\')">Get Item</button>' +
+                        '<p class="form-status" id="buy-status"></p>' +
+                        '</div>';
+                document.getElementById('item-author-link').addEventListener('click', e => {
+                        e.preventDefault();
+                        viewProfile(author);
+                });
+                if (currentUser) {
+                        checkOwnedStatus(itemId);
+                }
+        }).catch(err => {
+                content.innerHTML = '<div class="loading">Failed to load: ' + escapeHtml(err.message) + '</div>';
+        });
+}
+
+function checkOwnedStatus(itemId) {
+        fbGet('/users/' + encodeURIComponent(currentUser) + '/owned_items/' + encodeURIComponent(itemId) + '.json').then(val => {
+                const btn = document.getElementById('buy-btn');
+                if (!btn) return;
+                if (val === true) {
+                        btn.textContent = 'Owned';
+                        btn.classList.add('owned');
+                        btn.disabled = true;
+                }
+        }).catch(() => {});
+}
+
+function buyItem(itemId) {
+        if (!currentUser) {
+                alert('You must login first to get this item.');
+                openAuthModal();
+                return;
+        }
+        const btn = document.getElementById('buy-btn');
+        const status = document.getElementById('buy-status');
+        if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+        fbPut('/users/' + encodeURIComponent(currentUser) + '/owned_items/' + encodeURIComponent(itemId) + '.json', true).then(() => {
+                if (btn) {
+                        btn.textContent = 'Owned';
+                        btn.classList.add('owned');
+                }
+                if (status) {
+                        status.textContent = 'Item added to your inventory!';
+                        status.className = 'form-status ok';
+                }
+                alert('Item added to your inventory!');
+        }).catch(err => {
+                if (btn) { btn.disabled = false; btn.textContent = 'Get Item'; }
+                if (status) {
+                        status.textContent = 'Failed: ' + err.message;
+                        status.className = 'form-status err';
+                }
+        });
 }
 
 function viewProfile(name) {
@@ -184,6 +271,16 @@ function viewProfile(name) {
                 if (currentUser && currentUser !== name) {
                         followBtnHtml = '<button class="follow-btn" id="follow-btn" onclick="toggleFollow(\'' + escapeAttr(name) + '\')">Follow</button>';
                 }
+                let editBtnHtml = '';
+                if (currentUser && currentUser === name) {
+                        editBtnHtml = '<button class="edit-profile-btn" onclick="openEditProfile()">Edit Profile</button>';
+                }
+                let avatarHtml;
+                if (info.avatar) {
+                        avatarHtml = '<div class="profile-avatar"><img src="data:image/png;base64,' + info.avatar + '" alt="" style="width:100%;height:100%;object-fit:cover"></div>';
+                } else {
+                        avatarHtml = '<div class="profile-avatar">' + initials(name) + '</div>';
+                }
                 let gamesHtml = '';
                 if (userGames.length > 0) {
                         gamesHtml = '<h2 style="margin-bottom:16px;font-size:22px;font-weight:800">Games by ' + escapeHtml(name) + '</h2><div class="grid">';
@@ -198,10 +295,11 @@ function viewProfile(name) {
                         gamesHtml += '</div>';
                 }
                 content.innerHTML = '<div class="profile-header">' +
-                        '<div class="profile-avatar">' + initials(name) + '</div>' +
+                        avatarHtml +
                         '<div class="profile-info"><h2>' + escapeHtml(name) + '</h2>' +
                         '<div class="profile-bio">' + escapeHtml(info.bio || 'No bio yet.') + '</div>' +
-                        '<div class="profile-stats"><span><strong>' + fc + '</strong> followers</span><span><strong>' + userGames.length + '</strong> games</span></div></div>' +
+                        '<div class="profile-stats"><span><strong>' + fc + '</strong> followers</span><span><strong>' + userGames.length + '</strong> games</span></div>' +
+                        editBtnHtml + '</div>' +
                         followBtnHtml + '</div>' + gamesHtml;
                 if (currentUser && currentUser !== name) {
                         checkFollowStatus(name);
@@ -278,6 +376,79 @@ function previewImage(input, previewId) {
                 };
                 reader.readAsDataURL(input.files[0]);
         }
+}
+
+function previewAvatar(input, previewId) {
+        const preview = document.getElementById(previewId);
+        preview.innerHTML = '';
+        if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        preview.appendChild(img);
+                };
+                reader.readAsDataURL(input.files[0]);
+        }
+}
+
+function openEditProfile() {
+        if (!currentUser) return;
+        const dlg = document.createElement('div');
+        dlg.className = 'modal';
+        dlg.style.display = 'flex';
+        dlg.innerHTML = '<div class="modal-content">' +
+                '<span class="close" id="edit-close">&times;</span>' +
+                '<h3 style="margin-bottom:16px;font-size:18px;font-weight:700">Edit Profile</h3>' +
+                '<textarea id="edit-bio" placeholder="Bio" class="input"></textarea>' +
+                '<label class="file-label">New Avatar (square image):</label>' +
+                '<input type="file" id="edit-avatar" accept="image/png,image/jpeg" class="file-input" onchange="previewAvatar(this, \'edit-avatar-preview\')">' +
+                '<div id="edit-avatar-preview" class="avatar-preview"></div>' +
+                '<button class="primary-btn" id="edit-save">Save</button>' +
+                '<p class="form-status" id="edit-status"></p>' +
+                '</div>';
+        document.body.appendChild(dlg);
+        document.getElementById('edit-close').onclick = () => dlg.remove();
+        fbGet('/users/' + encodeURIComponent(currentUser) + '.json').then(info => {
+                if (info && info.bio) document.getElementById('edit-bio').value = info.bio;
+        });
+        document.getElementById('edit-save').onclick = () => {
+                const bio = document.getElementById('edit-bio').value.trim();
+                const avatarInput = document.getElementById('edit-avatar');
+                const status = document.getElementById('edit-status');
+                status.textContent = 'Saving...'; status.className = 'form-status';
+                if (avatarInput.files && avatarInput.files[0]) {
+                        const img = new Image();
+                        img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = 128;
+                                canvas.height = 128;
+                                const ctx = canvas.getContext('2d');
+                                const size = Math.min(img.width, img.height);
+                                const sx = (img.width - size) / 2;
+                                const sy = (img.height - size) / 2;
+                                ctx.drawImage(img, sx, sy, size, size, 0, 0, 128, 128);
+                                const dataUrl = canvas.toDataURL('image/png');
+                                const base64 = dataUrl.split(',')[1];
+                                saveProfile(bio, base64, status, dlg);
+                        };
+                        img.src = URL.createObjectURL(avatarInput.files[0]);
+                } else {
+                        saveProfile(bio, null, status, dlg);
+                }
+        };
+}
+
+function saveProfile(bio, avatarB64, status, dlg) {
+        fbGet('/users/' + encodeURIComponent(currentUser) + '.json').then(info => {
+                if (!info) { status.textContent = 'User not found'; status.className = 'form-status err'; return; }
+                info.bio = bio;
+                if (avatarB64) info.avatar = avatarB64;
+                fbPut('/users/' + encodeURIComponent(currentUser) + '.json', info).then(() => {
+                        status.textContent = 'Saved!'; status.className = 'form-status ok';
+                        setTimeout(() => { dlg.remove(); viewProfile(currentUser); }, 800);
+                }).catch(err => { status.textContent = 'Failed: ' + err.message; status.className = 'form-status err'; });
+        });
 }
 
 function readImageAsBase64(input, callback) {
@@ -399,18 +570,40 @@ function doSignup() {
         const name = document.getElementById('signup-name').value.trim();
         const pass = document.getElementById('signup-pass').value;
         const bio = document.getElementById('signup-bio').value.trim();
+        const avatarInput = document.getElementById('signup-avatar');
         const status = document.getElementById('signup-status');
         if (!name || !pass) { status.textContent = 'Enter name and password'; status.className = 'form-status err'; return; }
         status.textContent = 'Creating...'; status.className = 'form-status';
         fbGet('/users/' + encodeURIComponent(name) + '.json').then(existing => {
                 if (existing) { status.textContent = 'Username taken'; status.className = 'form-status err'; return; }
-                fbPut('/users/' + encodeURIComponent(name) + '.json', { password: pass, bio: bio, avatar: '' }).then(() => {
-                        currentUser = name;
-                        localStorage.setItem('bb_user', name);
-                        updateUserChip();
-                        closeAuthModal();
-                        status.textContent = '';
-                }).catch(err => { status.textContent = 'Signup failed: ' + err.message; status.className = 'form-status err'; });
+                const finish = (avatarB64) => {
+                        const data = { password: pass, bio: bio, avatar: avatarB64 || '' };
+                        fbPut('/users/' + encodeURIComponent(name) + '.json', data).then(() => {
+                                currentUser = name;
+                                localStorage.setItem('bb_user', name);
+                                updateUserChip();
+                                closeAuthModal();
+                                status.textContent = '';
+                        }).catch(err => { status.textContent = 'Signup failed: ' + err.message; status.className = 'form-status err'; });
+                };
+                if (avatarInput.files && avatarInput.files[0]) {
+                        const img = new Image();
+                        img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = 128;
+                                canvas.height = 128;
+                                const ctx = canvas.getContext('2d');
+                                const size = Math.min(img.width, img.height);
+                                const sx = (img.width - size) / 2;
+                                const sy = (img.height - size) / 2;
+                                ctx.drawImage(img, sx, sy, size, size, 0, 0, 128, 128);
+                                const dataUrl = canvas.toDataURL('image/png');
+                                finish(dataUrl.split(',')[1]);
+                        };
+                        img.src = URL.createObjectURL(avatarInput.files[0]);
+                } else {
+                        finish(null);
+                }
         }).catch(err => { status.textContent = 'Signup failed: ' + err.message; status.className = 'form-status err'; });
 }
 

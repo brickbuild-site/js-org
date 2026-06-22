@@ -418,6 +418,143 @@ color: #aaa;
 font-size: 12px;
 }
 
+.avatar-preview {
+width: 96px;
+height: 96px;
+margin: 0 auto 12px;
+border: 1px solid #ddd;
+border-radius: 50%;
+background: #f0f0f0;
+display: flex;
+align-items: center;
+justify-content: center;
+overflow: hidden;
+}
+
+.avatar-preview img {
+width: 100%;
+height: 100%;
+object-fit: cover;
+}
+
+.avatar-preview:empty::before {
+content: 'No avatar';
+color: #aaa;
+font-size: 11px;
+}
+
+.item-detail {
+max-width: 600px;
+margin: 0 auto;
+background: #fafafa;
+border: 1px solid #e8e8e8;
+border-radius: 16px;
+padding: 40px;
+text-align: center;
+}
+
+.item-detail-img {
+width: 200px;
+height: 200px;
+margin: 0 auto 24px;
+border: 2px solid #e8e8e8;
+border-radius: 12px;
+background: #fff;
+display: flex;
+align-items: center;
+justify-content: center;
+overflow: hidden;
+}
+
+.item-detail-img img {
+max-width: 100%;
+max-height: 100%;
+image-rendering: pixelated;
+}
+
+.item-detail h2 {
+font-size: 28px;
+font-weight: 800;
+margin-bottom: 8px;
+}
+
+.item-detail .item-type {
+display: inline-block;
+background: #f0f0f0;
+color: #555;
+font-size: 12px;
+font-weight: 600;
+padding: 4px 12px;
+border-radius: 12px;
+margin-bottom: 16px;
+text-transform: uppercase;
+letter-spacing: 0.5px;
+}
+
+.item-detail .item-author {
+font-size: 14px;
+color: #888;
+margin-bottom: 24px;
+}
+
+.item-detail .item-author a {
+color: #0066cc;
+text-decoration: none;
+font-weight: 600;
+}
+
+.buy-btn {
+background: #00875a;
+color: #ffffff;
+border: none;
+font-family: inherit;
+font-size: 16px;
+font-weight: 700;
+padding: 14px 32px;
+border-radius: 8px;
+cursor: pointer;
+width: 100%;
+margin-top: 8px;
+transition: all 0.15s;
+}
+
+.buy-btn:hover {
+background: #006644;
+transform: translateY(-1px);
+}
+
+.buy-btn:disabled {
+background: #999;
+cursor: not-allowed;
+transform: none;
+}
+
+.buy-btn.owned {
+background: #f0f0f0;
+color: #555;
+border: 1px solid #ddd;
+}
+
+.item-price {
+font-size: 24px;
+font-weight: 800;
+color: #00875a;
+margin: 16px 0;
+}
+
+.edit-profile-btn {
+background: #000;
+color: #fff;
+border: none;
+font-family: inherit;
+font-size: 12px;
+font-weight: 600;
+padding: 6px 14px;
+border-radius: 6px;
+cursor: pointer;
+margin-top: 12px;
+}
+
 .profile-header {
 display: flex;
 align-items: center;

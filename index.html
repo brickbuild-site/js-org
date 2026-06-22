@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BrickBuild</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -88,6 +88,13 @@
 <div id="catalog-grid" class="grid"><div class="loading">Loading catalog...</div></div>
 </div>
 
+<div id="panel-item" class="panel">
+<div class="panel-header">
+<button class="back-btn" onclick="showPanel('catalog')">&larr; Back to Catalog</button>
+</div>
+<div id="item-content"><div class="loading">Loading...</div></div>
+</div>
+
 <div id="panel-profile" class="panel">
 <div class="panel-header">
 <button class="back-btn" onclick="showPanel('users')">&larr; Back</button>
@@ -114,12 +121,15 @@
 <input type="text" id="signup-name" placeholder="Username" class="input">
 <input type="password" id="signup-pass" placeholder="Password" class="input">
 <textarea id="signup-bio" placeholder="Bio (optional)" class="input"></textarea>
+<label class="file-label">Avatar (optional, square image):</label>
+<input type="file" id="signup-avatar" accept="image/png,image/jpeg" class="file-input" onchange="previewAvatar(this, 'signup-avatar-preview')">
+<div id="signup-avatar-preview" class="avatar-preview"></div>
 <button class="primary-btn" onclick="doSignup()">Sign Up</button>
 <p class="form-status" id="signup-status"></p>
 </div>
 </div>
 </div>
 
-<script src="script.js?v=3"></script>
+<script src="script.js?v=4"></script>
 </body>
 </html>
