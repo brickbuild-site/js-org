@@ -1,0 +1,276 @@
+const FB = 'https://fir-database-67c79-default-rtdb.firebaseio.com';
+
+function fbGet(path) {
+        return fetch(FB + path).then(r => r.json());
+}
+
+function fbPut(path, data) {
+        return fetch(FB + path, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+        }).then(r => r.json());
+}
+
+function fbDelete(path) {
+        return fetch(FB + path, { method: 'DELETE' }).then(r => r.json());
+}
+
+function escapeHtml(s) {
+        if (s == null) return '';
+        return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function initials(name) {
+        if (!name) return '?';
+        return name.charAt(0).toUpperCase();
+}
+
+let currentUser = localStorage.getItem('bb_user') || null;
+
+function showPanel(name) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-btn[data-panel]').forEach(b => b.classList.remove('active'));
+        const panel = document.getElementById('panel-' + name);
+        if (panel) panel.classList.add('active');
+        const btn = document.querySelector('.nav-btn[data-panel="' + name + '"]');
+        if (btn) btn.classList.add('active');
+        if (name === 'games') loadGames();
+        if (name === 'users') loadUsers();
+        if (name === 'catalog') loadCatalog();
+}
+
+function loadGames() {
+        const grid = document.getElementById('games-grid');
+        grid.innerHTML = '<div class="loading">Loading games...</div>';
+        fbGet('/games.json').then(data => {
+                if (!data) { grid.innerHTML = '<div class="loading">No games yet.</div>'; return; }
+                const games = Object.entries(data);
+                if (games.length === 0) { grid.innerHTML = '<div class="loading">No games yet. Create one!</div>'; return; }
+                grid.innerHTML = '';
+                games.forEach(([gid, g]) => {
+                        const card = document.createElement('div');
+                        card.className = 'card';
+                        card.innerHTML = '<div class="card-title">' + escapeHtml(g.name || 'Untitled') + '</div>' +
+                                '<div class="card-meta">by ' + escapeHtml(g.author || 'Unknown') + '</div>' +
+                                '<div class="card-tag">Game</div>';
+                        card.onclick = () => { if (g.author) viewProfile(g.author); };
+                        grid.appendChild(card);
+                });
+        }).catch(() => { grid.innerHTML = '<div class="loading">Failed to load. Check your connection.</div>'; });
+}
+
+function loadUsers() {
+        const grid = document.getElementById('users-grid');
+        grid.innerHTML = '<div class="loading">Loading users...</div>';
+        fbGet('/users.json').then(data => {
+                if (!data) { grid.innerHTML = '<div class="loading">No users yet.</div>'; return; }
+                const names = Object.keys(data);
+                if (names.length === 0) { grid.innerHTML = '<div class="loading">No users yet.</div>'; return; }
+                grid.innerHTML = '';
+                Promise.all(names.map(n => fbGet('/users/' + encodeURIComponent(n) + '/followers.json'))).then(fols => {
+                        names.forEach((n, i) => {
+                                const info = data[n] || {};
+                                const fc = (fols[i] && typeof fols[i] === 'object') ? Object.keys(fols[i]).length : 0;
+                                const card = document.createElement('div');
+                                card.className = 'card user-card';
+                                card.innerHTML = '<div class="user-avatar">' + initials(n) + '</div>' +
+                                        '<div class="user-name">' + escapeHtml(n) + '</div>' +
+                                        '<div class="user-bio">' + escapeHtml(info.bio || '') + '</div>' +
+                                        '<div class="user-followers">' + fc + ' followers</div>';
+                                card.onclick = () => viewProfile(n);
+                                grid.appendChild(card);
+                        });
+                });
+        }).catch(() => { grid.innerHTML = '<div class="loading">Failed to load.</div>'; });
+}
+
+function loadCatalog() {
+        const grid = document.getElementById('catalog-grid');
+        grid.innerHTML = '<div class="loading">Loading catalog...</div>';
+        fbGet('/catalog.json').then(data => {
+                if (!data) { grid.innerHTML = '<div class="loading">Catalog is empty.</div>'; return; }
+                const items = Object.entries(data);
+                if (items.length === 0) { grid.innerHTML = '<div class="loading">Catalog is empty.</div>'; return; }
+                grid.innerHTML = '';
+                items.forEach(([iid, it]) => {
+                        const card = document.createElement('div');
+                        card.className = 'card';
+                        card.innerHTML = '<div class="card-title">' + escapeHtml(it.name || 'Untitled') + '</div>' +
+                                '<div class="card-meta">by ' + escapeHtml(it.author || 'Unknown') + '</div>' +
+                                '<div class="card-tag">' + escapeHtml((it.type || 'item').charAt(0).toUpperCase() + (it.type || '').slice(1)) + '</div>';
+                        card.onclick = () => { if (it.author) viewProfile(it.author); };
+                        grid.appendChild(card);
+                });
+        }).catch(() => { grid.innerHTML = '<div class="loading">Failed to load.</div>'; });
+}
+
+function viewProfile(name) {
+        showPanel('profile');
+        document.querySelectorAll('.nav-btn[data-panel]').forEach(b => b.classList.remove('active'));
+        const content = document.getElementById('profile-content');
+        content.innerHTML = '<div class="loading">Loading profile...</div>';
+        const enc = encodeURIComponent(name);
+        Promise.all([
+                fbGet('/users/' + enc + '.json'),
+                fbGet('/users/' + enc + '/followers.json'),
+                fbGet('/games.json')
+        ]).then(([info, followers, gamesData]) => {
+                if (!info) { content.innerHTML = '<div class="loading">User not found.</div>'; return; }
+                const fc = (followers && typeof followers === 'object') ? Object.keys(followers).length : 0;
+                let userGames = [];
+                if (gamesData) {
+                        Object.entries(gamesData).forEach(([gid, g]) => {
+                                if ((g.author || '') === name) {
+                                        userGames.push({ id: gid, name: g.name || 'Untitled', author: g.author || '' });
+                                }
+                        });
+                }
+                let followBtnHtml = '';
+                if (currentUser && currentUser !== name) {
+                        followBtnHtml = '<button class="follow-btn" id="follow-btn" onclick="toggleFollow(\'' + escapeHtml(name) + '\')">Follow</button>';
+                }
+                let gamesHtml = '';
+                if (userGames.length > 0) {
+                        gamesHtml = '<h2 style="margin-bottom:16px;font-size:22px;font-weight:800">Games by ' + escapeHtml(name) + '</h2><div class="grid">';
+                        userGames.forEach(g => {
+                                gamesHtml += '<div class="card"><div class="card-title">' + escapeHtml(g.name) + '</div><div class="card-meta">by ' + escapeHtml(g.author) + '</div><div class="card-tag">Game</div></div>';
+                        });
+                        gamesHtml += '</div>';
+                }
+                content.innerHTML = '<div class="profile-header">' +
+                        '<div class="profile-avatar">' + initials(name) + '</div>' +
+                        '<div class="profile-info"><h2>' + escapeHtml(name) + '</h2>' +
+                        '<div class="profile-bio">' + escapeHtml(info.bio || 'No bio yet.') + '</div>' +
+                        '<div class="profile-stats"><span><strong>' + fc + '</strong> followers</span><span><strong>' + userGames.length + '</strong> games</span></div></div>' +
+                        followBtnHtml + '</div>' + gamesHtml;
+                if (currentUser && currentUser !== name) {
+                        checkFollowStatus(name);
+                }
+        }).catch(() => { content.innerHTML = '<div class="loading">Failed to load.</div>'; });
+}
+
+function checkFollowStatus(name) {
+        if (!currentUser) return;
+        fbGet('/users/' + encodeURIComponent(name) + '/followers/' + encodeURIComponent(currentUser) + '.json').then(val => {
+                const btn = document.getElementById('follow-btn');
+                if (!btn) return;
+                if (val === true) {
+                        btn.textContent = 'Following';
+                        btn.classList.add('following');
+                } else {
+                        btn.textContent = 'Follow';
+                        btn.classList.remove('following');
+                }
+        });
+}
+
+function toggleFollow(name) {
+        if (!currentUser) { openAuthModal(); return; }
+        const btn = document.getElementById('follow-btn');
+        if (!btn) return;
+        if (btn.classList.contains('following')) {
+                fbDelete('/users/' + encodeURIComponent(name) + '/followers/' + encodeURIComponent(currentUser) + '.json').then(() => {
+                        btn.textContent = 'Follow';
+                        btn.classList.remove('following');
+                        viewProfile(name);
+                });
+        } else {
+                fbPut('/users/' + encodeURIComponent(name) + '/followers/' + encodeURIComponent(currentUser) + '.json', true).then(() => {
+                        btn.textContent = 'Following';
+                        btn.classList.add('following');
+                        viewProfile(name);
+                });
+        }
+}
+
+function switchCreateTab(tab, btn) {
+        document.querySelectorAll('.form-tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('create-game-form').style.display = tab === 'game' ? 'block' : 'none';
+        document.getElementById('create-shirt-form').style.display = tab === 'shirt' ? 'block' : 'none';
+        document.getElementById('create-pants-form').style.display = tab === 'pants' ? 'block' : 'none';
+}
+
+function createGame() {
+        const name = document.getElementById('game-name').value.trim();
+        const status = document.getElementById('game-status');
+        if (!name) { status.textContent = 'Enter a game name'; status.className = 'form-status err'; return; }
+        if (!currentUser) { status.textContent = 'Login first'; status.className = 'form-status err'; openAuthModal(); return; }
+        status.textContent = 'Creating...'; status.className = 'form-status';
+        const gid = 'game_' + Date.now();
+        fbPut('/games/' + gid + '.json', { name: name, author: currentUser, created_at: Date.now() / 1000 }).then(() => {
+                status.textContent = 'Created! ID: ' + gid; status.className = 'form-status ok';
+                document.getElementById('game-name').value = '';
+        }).catch(() => { status.textContent = 'Failed to create'; status.className = 'form-status err'; });
+}
+
+function openAuthModal() { document.getElementById('auth-modal').style.display = 'flex'; }
+function closeAuthModal() { document.getElementById('auth-modal').style.display = 'none'; }
+
+function switchAuthTab(tab, btn) {
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+        document.getElementById('signup-form').style.display = tab === 'signup' ? 'block' : 'none';
+}
+
+function doLogin() {
+        const name = document.getElementById('login-name').value.trim();
+        const pass = document.getElementById('login-pass').value;
+        const status = document.getElementById('login-status');
+        if (!name || !pass) { status.textContent = 'Enter name and password'; status.className = 'form-status err'; return; }
+        status.textContent = 'Logging in...'; status.className = 'form-status';
+        fbGet('/users/' + encodeURIComponent(name) + '.json').then(info => {
+                if (!info) { status.textContent = 'User not found'; status.className = 'form-status err'; return; }
+                if ((info.password || '') !== pass) { status.textContent = 'Wrong password'; status.className = 'form-status err'; return; }
+                currentUser = name;
+                localStorage.setItem('bb_user', name);
+                updateUserChip();
+                closeAuthModal();
+                status.textContent = '';
+        }).catch(() => { status.textContent = 'Login failed'; status.className = 'form-status err'; });
+}
+
+function doSignup() {
+        const name = document.getElementById('signup-name').value.trim();
+        const pass = document.getElementById('signup-pass').value;
+        const bio = document.getElementById('signup-bio').value.trim();
+        const status = document.getElementById('signup-status');
+        if (!name || !pass) { status.textContent = 'Enter name and password'; status.className = 'form-status err'; return; }
+        status.textContent = 'Creating...'; status.className = 'form-status';
+        fbGet('/users/' + encodeURIComponent(name) + '.json').then(existing => {
+                if (existing) { status.textContent = 'Username taken'; status.className = 'form-status err'; return; }
+                fbPut('/users/' + encodeURIComponent(name) + '.json', { password: pass, bio: bio, avatar: '' }).then(() => {
+                        currentUser = name;
+                        localStorage.setItem('bb_user', name);
+                        updateUserChip();
+                        closeAuthModal();
+                        status.textContent = '';
+                });
+        }).catch(() => { status.textContent = 'Signup failed'; status.className = 'form-status err'; });
+}
+
+function updateUserChip() {
+        const chip = document.getElementById('current-user-chip');
+        if (currentUser) {
+                chip.textContent = '@' + currentUser;
+                chip.style.display = 'inline';
+                const loginBtn = document.querySelector('.nav-btn.ghost');
+                if (loginBtn) { loginBtn.textContent = 'Logout'; loginBtn.onclick = doLogout; }
+        } else {
+                chip.style.display = 'none';
+                const loginBtn = document.querySelector('.nav-btn.ghost');
+                if (loginBtn) { loginBtn.textContent = 'Login'; loginBtn.onclick = openAuthModal; }
+        }
+}
+
+function doLogout() {
+        currentUser = null;
+        localStorage.removeItem('bb_user');
+        updateUserChip();
+        showPanel('games');
+}
+
+updateUserChip();
+showPanel('games');
