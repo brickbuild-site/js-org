@@ -304,20 +304,47 @@ function createClothingItem(type) {
         const nameInput = document.getElementById(type + '-name');
         const fileInput = document.getElementById(type + '-file');
         const status = document.getElementById(type + '-status');
+        if (!nameInput || !fileInput || !status) {
+                alert('Form not found: ' + type);
+                return;
+        }
         const name = nameInput.value.trim();
-        if (!name) { status.textContent = 'Enter a name'; status.className = 'form-status err'; return; }
-        if (!currentUser) { status.textContent = 'Login first'; status.className = 'form-status err'; openAuthModal(); return; }
-        if (!fileInput.files || !fileInput.files[0]) { status.textContent = 'Pick an image (128x128)'; status.className = 'form-status err'; return; }
-        status.textContent = 'Uploading...'; status.className = 'form-status';
+        if (!name) {
+                status.textContent = 'Enter a name first';
+                status.className = 'form-status err';
+                alert('Enter a ' + type + ' name first');
+                return;
+        }
+        if (!currentUser) {
+                status.textContent = 'Login first';
+                status.className = 'form-status err';
+                alert('You must login before creating a ' + type);
+                openAuthModal();
+                return;
+        }
+        if (!fileInput.files || !fileInput.files[0]) {
+                status.textContent = 'Pick an image (128x128)';
+                status.className = 'form-status err';
+                alert('Pick an image file (128x128 PNG or JPG) for your ' + type);
+                return;
+        }
+        status.textContent = 'Uploading...';
+        status.className = 'form-status';
         const img = new Image();
         img.onload = () => {
                 if (img.width !== 128 || img.height !== 128) {
-                        status.textContent = 'Image must be 128x128 pixels (got ' + img.width + 'x' + img.height + ')';
+                        status.textContent = 'Image must be 128x128 (got ' + img.width + 'x' + img.height + ')';
                         status.className = 'form-status err';
+                        alert('Image must be exactly 128x128 pixels. Yours is ' + img.width + 'x' + img.height + '.');
                         return;
                 }
                 readImageAsBase64(fileInput, base64 => {
-                        if (!base64) { status.textContent = 'Failed to read image'; status.className = 'form-status err'; return; }
+                        if (!base64) {
+                                status.textContent = 'Failed to read image';
+                                status.className = 'form-status err';
+                                alert('Failed to read image file');
+                                return;
+                        }
                         const itemId = type + '_' + Date.now();
                         const data = {
                                 name: name,
@@ -328,7 +355,9 @@ function createClothingItem(type) {
                                 created_at: Date.now() / 1000
                         };
                         fbPut('/catalog/' + itemId + '.json', data).then(() => {
-                                status.textContent = 'Created! ID: ' + itemId; status.className = 'form-status ok';
+                                status.textContent = 'Created! ID: ' + itemId;
+                                status.className = 'form-status ok';
+                                alert(type.charAt(0).toUpperCase() + type.slice(1) + ' "' + name + '" created successfully!');
                                 nameInput.value = '';
                                 fileInput.value = '';
                                 document.getElementById(type + '-preview').innerHTML = '';
