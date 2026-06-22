@@ -124,9 +124,16 @@ function loadCatalog() {
                 grid.innerHTML = '';
                 items.forEach(([iid, it]) => {
                         const card = document.createElement('div');
-                        card.className = 'card';
+                        card.className = 'card catalog-card';
                         const author = it.author || 'Unknown';
-                        card.innerHTML = '<div class="card-title">' + escapeHtml(it.name || 'Untitled') + '</div>' +
+                        let imgHtml = '';
+                        if (it.image_data) {
+                                imgHtml = '<div class="catalog-img"><img src="data:image/png;base64,' + it.image_data + '" alt=""></div>';
+                        } else if (it.image_path) {
+                                imgHtml = '<div class="catalog-img"><img src="' + escapeHtml(it.image_path) + '" alt=""></div>';
+                        }
+                        card.innerHTML = imgHtml +
+                                '<div class="card-title">' + escapeHtml(it.name || 'Untitled') + '</div>' +
                                 '<div class="card-meta">by <a href="#" class="author-link" data-author="' + escapeHtml(author) + '">' + escapeHtml(author) + '</a></div>' +
                                 '<div class="card-tag">' + escapeHtml((it.type || 'item').charAt(0).toUpperCase() + (it.type || '').slice(1)) + '</div>';
                         card.querySelector('.author-link').addEventListener('click', e => {
@@ -257,6 +264,79 @@ function createGame() {
                 status.textContent = 'Created! ID: ' + gid; status.className = 'form-status ok';
                 document.getElementById('game-name').value = '';
         }).catch(err => { status.textContent = 'Failed: ' + err.message; status.className = 'form-status err'; });
+}
+
+function previewImage(input, previewId) {
+        const preview = document.getElementById(previewId);
+        preview.innerHTML = '';
+        if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        preview.appendChild(img);
+                };
+                reader.readAsDataURL(input.files[0]);
+        }
+}
+
+function readImageAsBase64(input, callback) {
+        if (!input.files || !input.files[0]) { callback(null); return; }
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = e => {
+                const dataUrl = e.target.result;
+                const base64 = dataUrl.split(',')[1];
+                callback(base64);
+        };
+        reader.readAsDataURL(file);
+}
+
+function createShirt() {
+        createClothingItem('shirt');
+}
+
+function createPants() {
+        createClothingItem('pants');
+}
+
+function createClothingItem(type) {
+        const nameInput = document.getElementById(type + '-name');
+        const fileInput = document.getElementById(type + '-file');
+        const status = document.getElementById(type + '-status');
+        const name = nameInput.value.trim();
+        if (!name) { status.textContent = 'Enter a name'; status.className = 'form-status err'; return; }
+        if (!currentUser) { status.textContent = 'Login first'; status.className = 'form-status err'; openAuthModal(); return; }
+        if (!fileInput.files || !fileInput.files[0]) { status.textContent = 'Pick an image (128x128)'; status.className = 'form-status err'; return; }
+        status.textContent = 'Uploading...'; status.className = 'form-status';
+        const img = new Image();
+        img.onload = () => {
+                if (img.width !== 128 || img.height !== 128) {
+                        status.textContent = 'Image must be 128x128 pixels (got ' + img.width + 'x' + img.height + ')';
+                        status.className = 'form-status err';
+                        return;
+                }
+                readImageAsBase64(fileInput, base64 => {
+                        if (!base64) { status.textContent = 'Failed to read image'; status.className = 'form-status err'; return; }
+                        const itemId = type + '_' + Date.now();
+                        const data = {
+                                name: name,
+                                type: type,
+                                author: currentUser,
+                                image_data: base64,
+                                image_path: '',
+                                created_at: Date.now() / 1000
+                        };
+                        fbPut('/catalog/' + itemId + '.json', data).then(() => {
+                                status.textContent = 'Created! ID: ' + itemId; status.className = 'form-status ok';
+                                nameInput.value = '';
+                                fileInput.value = '';
+                                document.getElementById(type + '-preview').innerHTML = '';
+                        }).catch(err => { status.textContent = 'Failed: ' + err.message; status.className = 'form-status err'; });
+                });
+        };
+        img.onerror = () => { status.textContent = 'Invalid image'; status.className = 'form-status err'; };
+        img.src = URL.createObjectURL(fileInput.files[0]);
 }
 
 function openAuthModal() { document.getElementById('auth-modal').style.display = 'flex'; }

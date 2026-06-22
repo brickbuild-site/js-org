@@ -61,11 +61,21 @@
 </div>
 <div id="create-shirt-form" class="form-section" style="display:none">
 <h3>Create a Shirt</h3>
-<p class="hint">Shirt creation is available in the game client. Use the Create tab in-game.</p>
+<input type="text" id="shirt-name" placeholder="Shirt name (e.g. Blue Stripes)" class="input">
+<label class="file-label">Image (128x128 PNG/JPG):</label>
+<input type="file" id="shirt-file" accept="image/png,image/jpeg" class="file-input" onchange="previewImage(this, 'shirt-preview')">
+<div id="shirt-preview" class="image-preview"></div>
+<button class="primary-btn" onclick="createShirt()">Create Shirt</button>
+<p class="form-status" id="shirt-status"></p>
 </div>
 <div id="create-pants-form" class="form-section" style="display:none">
 <h3>Create Pants</h3>
-<p class="hint">Pants creation is available in the game client. Use the Create tab in-game.</p>
+<input type="text" id="pants-name" placeholder="Pants name (e.g. Camo Pants)" class="input">
+<label class="file-label">Image (128x128 PNG/JPG):</label>
+<input type="file" id="pants-file" accept="image/png,image/jpeg" class="file-input" onchange="previewImage(this, 'pants-preview')">
+<div id="pants-preview" class="image-preview"></div>
+<button class="primary-btn" onclick="createPants()">Create Pants</button>
+<p class="form-status" id="pants-status"></p>
 </div>
 </div>
 </div>
